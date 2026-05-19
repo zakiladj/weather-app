@@ -26,7 +26,8 @@ const sizeConfig = {
   lg: { height: 56, px: 28, radius: Radius['2xl'], textVariant: 'headline' as const },
 };
 
-export interface ButtonProps extends Omit<PressableProps, 'style'> {
+export interface ButtonProps extends Omit<PressableProps, 'style' | 'children'> {
+  children?: React.ReactNode;
   label?: string;
   variant?: ButtonVariant;
   size?: ButtonSize;
