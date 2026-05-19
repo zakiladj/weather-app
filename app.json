@@ -23,8 +23,18 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+    "extra": {
+      "weatherApiKey": "",
+      "appEnv": "development"
+    },
     "plugins": [
       "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to show local weather."
+        }
+      ],
       [
         "expo-splash-screen",
         {

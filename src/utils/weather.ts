@@ -1,6 +1,34 @@
 import type { TemperatureUnit, WindSpeedUnit } from '@/types';
 import type { WeatherCondition } from '@/features/weather/types';
 
+const CONDITION_MAP: Record<string, WeatherCondition> = {
+  clear: 'clear',
+  clouds: 'clouds',
+  rain: 'rain',
+  drizzle: 'drizzle',
+  thunderstorm: 'thunderstorm',
+  snow: 'snow',
+  mist: 'mist',
+  fog: 'fog',
+  haze: 'mist',
+  smoke: 'mist',
+  dust: 'mist',
+  sand: 'mist',
+  ash: 'mist',
+  squall: 'thunderstorm',
+  tornado: 'thunderstorm',
+};
+
+export function normalizeCondition(raw: string): WeatherCondition {
+  return CONDITION_MAP[raw.toLowerCase()] ?? 'clouds';
+}
+
+const COMPASS_DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] as const;
+
+export function degreesToCompass(deg: number): string {
+  return COMPASS_DIRS[Math.round(deg / 45) % 8];
+}
+
 export function convertTemperature(celsius: number, unit: TemperatureUnit): number {
   if (unit === 'fahrenheit') return Math.round(celsius * 9 / 5 + 32);
   return Math.round(celsius);

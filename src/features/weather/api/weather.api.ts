@@ -1,6 +1,9 @@
-import { weatherApi } from '@/lib/axios';
+import { geoApi, weatherApi } from '@/lib/axios';
 import type { Coordinates } from '@/types';
-import type { CurrentWeather, WeatherForecast } from '../types';
+import { normalizeCondition } from '@/utils/weather';
+import type { CurrentWeather, WeatherForecast, WeatherLocation } from '../types';
+
+// ─── Current weather ───────────────────────────────────────────────────────────
 
 export async function fetchCurrentWeather(coords: Coordinates): Promise<CurrentWeather> {
   const { data } = await weatherApi.get('/weather', {
@@ -13,16 +16,18 @@ export async function fetchCurrentWeather(coords: Coordinates): Promise<CurrentW
     feelsLike: data.main.feels_like,
     humidity: data.main.humidity,
     windSpeed: data.wind.speed,
-    windDirection: data.wind.deg,
-    condition: data.weather[0].main.toLowerCase(),
+    windDirection: data.wind.deg ?? 0,
+    condition: normalizeCondition(data.weather[0].main),
     description: data.weather[0].description,
     iconCode: data.weather[0].icon,
-    visibility: data.visibility,
+    visibility: data.visibility ?? 0,
     uvIndex: 0,
     pressure: data.main.pressure,
     updatedAt: data.dt * 1000,
   };
 }
+
+// ─── Forecast ─────────────────────────────────────────────────────────────────
 
 export async function fetchWeatherForecast(coords: Coordinates): Promise<WeatherForecast> {
   const { data } = await weatherApi.get('/forecast', {
@@ -32,15 +37,19 @@ export async function fetchWeatherForecast(coords: Coordinates): Promise<Weather
   const hourly = data.list.slice(0, 24).map((item: any) => ({
     timestamp: item.dt * 1000,
     temperature: item.main.temp,
-    condition: item.weather[0].main.toLowerCase(),
+    condition: normalizeCondition(item.weather[0].main),
     iconCode: item.weather[0].icon,
     precipitationChance: Math.round((item.pop ?? 0) * 100),
   }));
 
+  // Deduplicate by calendar date — keep the noon slot when available
   const dailyMap = new Map<string, any>();
   for (const item of data.list) {
     const date = new Date(item.dt * 1000).toISOString().slice(0, 10);
-    if (!dailyMap.has(date)) dailyMap.set(date, item);
+    const existing = dailyMap.get(date);
+    const hour = new Date(item.dt * 1000).getUTCHours();
+    // Prefer 12:00 UTC slot; otherwise keep the first seen
+    if (!existing || hour === 12) dailyMap.set(date, item);
   }
 
   const daily = Array.from(dailyMap.values())
@@ -49,7 +58,7 @@ export async function fetchWeatherForecast(coords: Coordinates): Promise<Weather
       date: new Date(item.dt * 1000).toISOString().slice(0, 10),
       tempMin: item.main.temp_min,
       tempMax: item.main.temp_max,
-      condition: item.weather[0].main.toLowerCase(),
+      condition: normalizeCondition(item.weather[0].main),
       iconCode: item.weather[0].icon,
       precipitationChance: Math.round((item.pop ?? 0) * 100),
       humidity: item.main.humidity,
@@ -59,4 +68,36 @@ export async function fetchWeatherForecast(coords: Coordinates): Promise<Weather
     }));
 
   return { locationId: String(data.city.id), hourly, daily };
+}
+
+// ─── Geocoding ────────────────────────────────────────────────────────────────
+
+export async function fetchReverseGeocode(coords: Coordinates): Promise<WeatherLocation> {
+  const { data } = await geoApi.get('/reverse', {
+    params: { lat: coords.lat, lon: coords.lon, limit: 1 },
+  });
+
+  if (!data.length) throw new Error('No location found for these coordinates');
+
+  const place = data[0];
+  return {
+    id: `${coords.lat.toFixed(4)},${coords.lon.toFixed(4)}`,
+    name: place.local_names?.en ?? place.name,
+    country: place.country,
+    coordinates: coords,
+    isCurrentLocation: true,
+  };
+}
+
+export async function fetchLocationSearch(query: string): Promise<WeatherLocation[]> {
+  const { data } = await geoApi.get('/direct', {
+    params: { q: query.trim(), limit: 5 },
+  });
+
+  return (data as any[]).map((place) => ({
+    id: `${(place.lat as number).toFixed(4)},${(place.lon as number).toFixed(4)}`,
+    name: place.local_names?.en ?? place.name,
+    country: place.country,
+    coordinates: { lat: place.lat as number, lon: place.lon as number },
+  }));
 }

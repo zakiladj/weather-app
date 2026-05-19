@@ -1,15 +1,14 @@
 # Project Memory
 
 ## Project status
-Two phases complete. Ready to build screens.
 
 | Phase | Status |
 |---|---|
 | 1 — Architecture & infrastructure | ✅ Done |
 | 2 — Design system & UI components | ✅ Done |
-| 3 — Screen implementation | ⬜ Next |
-| 4 — Location features | ⬜ Planned |
-| 5 — Polish & animations | ⬜ Planned |
+| 3 — Screen implementation | ✅ Done |
+| 4 — Location & real API | ⬜ Next |
+| 5 — Polish & release | ⬜ Planned |
 
 ---
 
@@ -80,10 +79,10 @@ src/
 │   ├── _layout.tsx                   # Root: AppProviders → ThemeProvider → Stack
 │   ├── +not-found.tsx
 │   └── (tabs)/
-│       ├── _layout.tsx               # Tab navigator
-│       ├── index.tsx                 # Today screen (stub)
-│       ├── forecast.tsx              # Forecast screen (stub)
-│       └── settings.tsx              # Settings screen (stub)
+│       ├── _layout.tsx               # Glass tab bar, SF Symbols icons, absolute position
+│       ├── index.tsx                 # Today screen — full implementation ✅
+│       ├── forecast.tsx              # Forecast screen — full implementation ✅
+│       └── settings.tsx              # Settings screen — full implementation ✅
 │
 ├── design/                           # Design system foundation
 │   ├── tokens.ts                     # Typography, Spacing, Radius, Shadows, GlassColors, Duration
@@ -101,10 +100,12 @@ src/
 │   │   └── Divider.tsx               # horizontal / vertical, glass-friendly
 │   │
 │   └── weather/                      # Weather domain components
-│       ├── WeatherIcon.tsx           # condition → emoji, day/night, 6 sizes
+│       ├── WeatherIcon.tsx           # condition → emoji, day/night, 6 sizes (xs → 2xl)
 │       ├── CurrentWeatherCard.tsx    # Hero card — temp, condition, badges, footer
 │       ├── HourlyItem.tsx            # Vertical chip — time, icon, rain%, temp
-│       ├── DailyItem.tsx             # Row — day, icon, rain%, temp range bar
+│       ├── HourlyForecastCard.tsx    # Glass section card wrapping HourlyItem scroll
+│       ├── DailyItem.tsx             # Row — day, icon, rain%, normalised temp bar
+│       ├── DailyForecastCard.tsx     # Glass section card wrapping DailyItem list
 │       ├── StatBadge.tsx             # Stat pill + StatGrid 2-col wrapper
 │       └── WeatherCardSkeleton.tsx   # 4 exports: card, hourly, daily, stat skeletons
 │
@@ -147,9 +148,9 @@ src/
 ## Design system decisions
 
 ### Styling approach
-- All new components use NativeWind `className` exclusively for layout, spacing, color utilities
+- Design-system components (`ui/`, `weather/`) use NativeWind `className` for layout, spacing, and color utilities
 - `style` prop reserved for: iOS shadow objects, dynamic rgba colors, Reanimated animated styles
-- No `StyleSheet.create()` anywhere in the design system — deliberate, keep it that way
+- Screen files (`app/(tabs)/*.tsx`) use `StyleSheet.create` for structural styles — appropriate at screen level
 
 ### Typography
 - Full iOS HIG scale in `src/design/tokens.ts` — `display` (96px / weight 200) down to `caption2` (11px)
@@ -167,7 +168,8 @@ src/
 - `GlassCard` accepts a `glowColor` prop which overrides the shadow color with 30% opacity
 
 ### Gradients
-- `getConditionGradient(condition, isNight)` → `GradientConfig` ready for `<LinearGradient colors={...} start={...} end={...} />`
+- `getConditionGradient(condition, isNight)` → `GradientConfig` ready for `<LinearGradient />`
+- Cast `colors` to `[string, string, ...string[]]` before passing — expo-linear-gradient requires a tuple type
 - `getCurrentSkyGradient()` → ambient sky based on current local hour (9 time-of-day bands)
 - `getSkyPeriod(hour)` → `SkyPeriod` string — useful for picking themed icons or background overlays
 
@@ -175,6 +177,7 @@ src/
 - `primary` wraps content in `LinearGradient` (default `#60A5FA → #3B82F6`)
 - `gradientFrom` / `gradientTo` props let any screen override the gradient for condition-matched buttons
 - Press animation: Reanimated `withTiming(0.96)` scale — fast (150ms in, 150ms out)
+- `ButtonProps` explicitly re-declares `children?: React.ReactNode` (overrides Pressable's function-children type)
 
 ### Skeleton
 - Single pulsing opacity animation (`withRepeat`, sin-wave easing, infinite)
@@ -183,7 +186,42 @@ src/
 
 ### DailyItem temperature bar
 - Requires `globalMin` and `globalMax` (across the full 7-day range) so all rows share a normalised scale
-- Compute these in the parent before rendering the list
+- `DailyForecastCard` computes these internally from its `items` array before rendering
+
+---
+
+## Screen implementation decisions
+
+### Shared pattern across all screens
+- `StatusBar translucent barStyle="light-content"` — allows gradient to bleed under status bar
+- `useSafeAreaInsets()` for top/bottom padding — never hardcode inset values
+- `paddingBottom: insets.bottom + 100` — tab bar is `position: absolute`, content must clear it
+- Mock data defined at module level as `const` — not inside the component
+- 1.2–1.6s `setTimeout` simulates loading so skeletons are visibly demonstrated on first launch
+
+### Today screen (index.tsx)
+- Background: `getConditionGradient(condition, isNight)` — condition-specific gradient as full-screen `LinearGradient`
+- `rgba(0,0,0,0.14)` depth overlay `absoluteFill` on top of gradient for legibility
+- Scroll animations: `useSharedValue` + `useAnimatedScrollHandler` driving two interpolations:
+  - Hero fades + parallax-rises: opacity 1→0 and translateY 0→-60 between scrollY 100–240
+  - Mini sticky header fades in: opacity 0→1 between scrollY 160–230
+- Entrance: hero uses `FadeInDown.delay(60).duration(600)`; cards staggered `FadeInUp` at 100/220/340ms
+- `statsData` wrapped in `useMemo` — depends on unit-converted values
+
+### Forecast screen (forecast.tsx)
+- Background: `getCurrentSkyGradient()` — ambient time-of-day sky (not condition-specific)
+- Three cards rendered with staggered `FadeInUp` (80/180/280ms):
+  1. `DailyForecastCard` — full 7-day list
+  2. Today's Details — 3×2 grid of sunrise/sunset, high/low, humidity/wind
+  3. Weekly Overview — compact strip showing all 7 days with icon, rain%, min/max
+- Detail grid uses explicit `DetailRow` components (2 cells + vertical divider) — avoids flex-wrap overflow
+
+### Settings screen (settings.tsx)
+- Dark navy `#0C0A1E` background — no weather-specific gradient (settings are context-neutral)
+- Three `GlassCard` sections: Units, Appearance, About
+- Custom `SegmentedControl` — glass `backgroundColor`, active segment at `rgba(255,255,255,0.20)`, rounded ends
+- All toggles wired to `useWeatherStore` — changes apply instantly across all tabs
+- Staggered `FadeInUp` at 60/140/220ms per section
 
 ---
 
@@ -195,6 +233,7 @@ src/
 - **Theme**: Zustand stores `'light' | 'dark' | 'system'`; `useAppTheme` resolves → `isDark: boolean`
 - **NativeWind entry**: `global.css` is the first import in `_layout.tsx`
 - **Tab routing**: `(tabs)/` group — parentheses keep "tabs" out of the URL
+- **Tab bar**: `position: absolute` — screens must add bottom padding equal to tab bar height + safe area
 
 ---
 
@@ -205,8 +244,10 @@ src/
 
 ---
 
-## Known boilerplate to remove
-These Expo template files are still on disk — delete before building screens:
-- `src/app/explore.tsx`, `src/app/index.tsx`
-- `src/components/animated-icon.*`, `app-tabs.*`, `themed-text.tsx`, `themed-view.tsx`, `hint-row.tsx`, `external-link.tsx`, `web-badge.tsx`, `ui/collapsible.tsx`
-- `src/constants/theme.ts`, `src/hooks/use-color-scheme.*`, `src/hooks/use-theme.ts` — replaceable by design system once screens are migrated
+## Phase 4 — Location & real API (next)
+
+1. **Wire API** — replace mock data in all three screens with `useCurrentWeather` / `useWeatherForecast` hooks; requires `WEATHER_API_KEY` in `app.json` extra block
+2. **Location search screen** — new stack screen (`app/search.tsx`), `Input` component, OWM geocoding endpoint
+3. **GPS permission** — `expo-location`, `requestForegroundPermissionsAsync`, feed coords into Zustand `activeLocation`
+4. **Error states** — empty states, network error banners, retry buttons using `Button` component
+5. **Pull-to-refresh** — `RefreshControl` on all scroll views, call `refetch()` from React Query

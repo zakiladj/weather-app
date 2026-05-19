@@ -104,32 +104,66 @@ expo-linear-gradient@~55.0.14    (Button primary gradient, sky backgrounds)
 
 ---
 
-## Known debt (untouched, still on disk)
-- `src/app/explore.tsx`, `src/app/index.tsx` — unused template screens
-- `src/components/animated-icon.*`, `app-tabs.*`, `themed-text.tsx`, `themed-view.tsx`, `hint-row.tsx`, `external-link.tsx`, `web-badge.tsx`, `ui/collapsible.tsx` — Expo template components
-- `src/constants/theme.ts`, `src/hooks/use-color-scheme.*`, `src/hooks/use-theme.ts` — legacy template hooks, safe to delete once screens are migrated off them
+## Phase 3 — Screen implementation ✅
+
+### Boilerplate deleted
+Removed 17 Expo template files that were no longer needed:
+- `src/app/explore.tsx`, `src/app/index.tsx`
+- `src/components/animated-icon.*`, `app-tabs.*`, `themed-text.tsx`, `themed-view.tsx`, `hint-row.tsx`, `external-link.tsx`, `web-badge.tsx`, `ui/collapsible.tsx`
+- `src/constants/theme.ts`, `src/hooks/use-color-scheme.*`, `src/hooks/use-theme.ts`
+
+### New section components created
+- `src/components/weather/HourlyForecastCard.tsx` — `GlassCard` wrapper with "🕐 HOURLY FORECAST" header, `Divider`, horizontal `ScrollView` of `HourlyItem` chips; `isCurrentHour={index === 0}`
+- `src/components/weather/DailyForecastCard.tsx` — `GlassCard` wrapper with "📅 7-DAY FORECAST" header, `Divider`, `DailyItem` list; computes `globalMin` / `globalMax` internally
+
+### Tab bar updated — `src/app/(tabs)/_layout.tsx`
+- `position: absolute` glass tab bar — `rgba(10,12,30,0.82)` background, `borderTopWidth: 0.5`
+- `SymbolView` SF Symbols icons — `sun.max.fill`, `calendar`, `gearshape.fill` (iOS) with Material fallbacks
+- Active tint: `#FFFFFF` / inactive: `rgba(255,255,255,0.40)`
+
+### Today screen — `src/app/(tabs)/index.tsx`
+- Full-screen `LinearGradient` from `getConditionGradient(condition, isNight)` + `rgba(0,0,0,0.14)` depth overlay
+- Sticky mini header (absolute, `zIndex: 10`) fades in as hero scrolls away
+- Scroll-driven animations via `useSharedValue` + `useAnimatedScrollHandler`:
+  - Hero: opacity + parallax translateY between `scrollY` 100–240
+  - Mini header: opacity between `scrollY` 160–230
+- Entrance: `FadeInDown.delay(60)` hero; `FadeInUp` cards staggered at 100/220/340ms
+- Sections: `HourlyForecastCard` → `DailyForecastCard` → `StatGrid` (6 stats via `useMemo`)
+- Loading state: 1.6s `setTimeout`, shows `HourlyScrollSkeleton` + `DailyListSkeleton` + `StatGridSkeleton`
+- Mock: 14 hourly items, 7 daily items, clear sky 22°C Paris
+
+### Forecast screen — `src/app/(tabs)/forecast.tsx`
+- Full-screen `getCurrentSkyGradient()` background (time-of-day ambient, not condition-specific)
+- Large "Forecast" page header with city + country label
+- Three cards with staggered `FadeInUp` (80/180/280ms):
+  1. `DailyForecastCard` — full 7-day list
+  2. Today's Details — 3×2 grid: sunrise/sunset, high/low, humidity/wind using explicit `DetailRow` + `DetailCell` components
+  3. Weekly Overview — compact strip with `WeatherIcon`, rain%, min/max per day
+- Loading state: 1.2s `setTimeout`, shows `DailyListSkeleton`
+
+### Settings screen — `src/app/(tabs)/settings.tsx`
+- Dark navy `#0C0A1E` background — no weather gradient (context-neutral)
+- Three `GlassCard` sections with staggered `FadeInUp` (60/140/220ms):
+  - **Units** — temperature (°C / °F) and wind speed (km/h / mph / m/s) toggles
+  - **Appearance** — theme mode (Light / Dark / System) toggle
+  - **About** — Version, Data Source, Refresh Interval static rows
+- Custom `SegmentedControl` — glass background, active at `rgba(255,255,255,0.20)`, rounded ends per segment
+- All toggles wired to `useWeatherStore` — changes are instant and persist across tabs
+
+### TypeScript fixes
+- `LinearGradient colors` cast to `[string, string, ...string[]]` — expo-linear-gradient requires a tuple type, not `string[]`
+- `Button.tsx` — `ButtonProps` now uses `Omit<PressableProps, 'style' | 'children'>` + `children?: React.ReactNode` to override Pressable's function-children union type
 
 ---
 
-## Phase 3 — Screen implementation (Up next)
+## Phase 4 — Location & real API (next)
 
-**Order matters** — complete in sequence:
+**Priority order:**
 
-1. **Delete boilerplate** — remove all files listed in "Known debt" above
-2. **Today screen** (`(tabs)/index.tsx`)
-   - Full-screen `LinearGradient` sky background via `getCurrentSkyGradient()`
-   - `CurrentWeatherCard` hero at top
-   - Horizontal `ScrollView` of `HourlyItem` chips
-   - `StatGrid` with humidity, wind, UV, pressure
-   - Loading state: `WeatherCardSkeleton` + `HourlyScrollSkeleton` + `StatGridSkeleton`
-3. **Forecast screen** (`(tabs)/forecast.tsx`)
-   - `GlassCard` container with `DailyItem` list (7 rows)
-   - Compute `globalMin` / `globalMax` before rendering the list
-   - Loading state: `DailyListSkeleton`
-4. **Settings screen** (`(tabs)/settings.tsx`)
-   - Temperature unit toggle (`celsius / fahrenheit`)
-   - Wind speed unit toggle (`km/h / mph / m/s`)
-   - Theme mode selector (`light / dark / system`)
-   - All state from `useWeatherStore`
-5. **Location search** — new stack screen, `Input` component, `expo-location` for GPS permission
-6. **Entrance animations** — Reanimated `FadeInDown` / `SlideInUp` on screen mount
+1. **Add API key** — set `WEATHER_API_KEY` in `app.json` `extra` block; it's already wired in `src/config/env.ts`
+2. **Wire Today screen** — replace `MOCK_WEATHER` / `MOCK_HOURLY` with `useCurrentWeather` + `useWeatherForecast` hooks from `src/features/weather/hooks/`
+3. **Wire Forecast screen** — replace `MOCK_DAILY` with live forecast data from the same query
+4. **GPS flow** — install `expo-location`, call `requestForegroundPermissionsAsync`, store coords in Zustand `activeLocation`; Today screen already reads `activeLocation` from store
+5. **Location search screen** — new `app/search.tsx` stack screen; `Input` component driving OWM geocoding; results stored via `addSavedLocation` / `setActiveLocation`
+6. **Error & empty states** — network error banners, retry `Button`, empty location state on first launch
+7. **Pull-to-refresh** — `RefreshControl` on all `ScrollView`s calling React Query `refetch()`
