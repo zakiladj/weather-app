@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -11,7 +11,18 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Divider } from '@/components/ui/Divider';
@@ -21,6 +32,7 @@ import { Text } from '@/components/ui/Text';
 import { GlassColors, Radius } from '@/design/tokens';
 import { useLocationSearch } from '@/features/weather/hooks/use-location-search';
 import type { WeatherLocation } from '@/features/weather/types';
+import { useSpringPress } from '@/hooks/use-spring-press';
 import { useWeatherStore } from '@/store/weather.store';
 
 // ─── Screen ────────────────────────────────────────────────────────────────────
@@ -149,7 +161,10 @@ export default function SearchScreen() {
                   <SectionHeader title="Saved Cities" />
                   <GlassCard padding={false} radius={20} colorScheme="dark" style={styles.card}>
                     {savedLocations.map((loc, idx) => (
-                      <React.Fragment key={loc.id}>
+                      <Animated.View
+                        key={loc.id}
+                        entering={FadeIn.delay(idx * 55).duration(340)}
+                      >
                         {idx > 0 && <Divider color={GlassColors.white10} />}
                         <SavedRow
                           item={loc}
@@ -157,7 +172,7 @@ export default function SearchScreen() {
                           onPress={handleSelect}
                           onRemove={() => removeSavedLocation(loc.id)}
                         />
-                      </React.Fragment>
+                      </Animated.View>
                     ))}
                   </GlassCard>
                 </>
@@ -172,7 +187,10 @@ export default function SearchScreen() {
                   />
                   <GlassCard padding={false} radius={20} colorScheme="dark" style={styles.card}>
                     {recentSearches.map((loc, idx) => (
-                      <React.Fragment key={loc.id}>
+                      <Animated.View
+                        key={loc.id}
+                        entering={FadeIn.delay(idx * 55).duration(340)}
+                      >
                         {idx > 0 && <Divider color={GlassColors.white10} />}
                         <RecentRow
                           item={loc}
@@ -180,19 +198,18 @@ export default function SearchScreen() {
                           onPress={handleSelect}
                           onDelete={() => removeRecentSearch(loc.id)}
                         />
-                      </React.Fragment>
+                      </Animated.View>
                     ))}
                   </GlassCard>
                 </>
               )}
 
               {savedLocations.length === 0 && recentSearches.length === 0 && (
-                <View style={styles.feedback}>
-                  <Text variant="title2" color={GlassColors.white30}>🌍</Text>
-                  <Text variant="body" color={GlassColors.white30} style={styles.feedbackText}>
-                    Start typing to search for a city
-                  </Text>
-                </View>
+                <FloatingFeedback
+                  emoji="🌍"
+                  color={GlassColors.white30}
+                  message="Start typing to search for a city"
+                />
               )}
             </Animated.View>
           )}
@@ -206,11 +223,12 @@ export default function SearchScreen() {
 
           {/* ── Empty state ── */}
           {showEmpty && (
-            <Animated.View entering={FadeInUp.duration(250)} style={styles.feedback}>
-              <Text variant="title2" color="#FFFFFF">🔍</Text>
-              <Text variant="body" color={GlassColors.white50} style={styles.feedbackText}>
-                No cities found for "{debouncedQuery}"
-              </Text>
+            <Animated.View entering={FadeInUp.duration(250)}>
+              <FloatingFeedback
+                emoji="🔍"
+                color={GlassColors.white50}
+                message={`No cities found for "${debouncedQuery}"`}
+              />
             </Animated.View>
           )}
 
@@ -220,7 +238,10 @@ export default function SearchScreen() {
               <SectionHeader title="Results" />
               <GlassCard padding={false} radius={20} colorScheme="dark" style={styles.card}>
                 {results.map((item, idx) => (
-                  <React.Fragment key={item.id}>
+                  <Animated.View
+                    key={item.id}
+                    entering={FadeIn.delay(idx * 60).duration(350)}
+                  >
                     {idx > 0 && <Divider color={GlassColors.white10} />}
                     <ResultRow
                       item={item}
@@ -229,7 +250,7 @@ export default function SearchScreen() {
                       onPress={handleSelect}
                       onToggleSave={handleToggleSave}
                     />
-                  </React.Fragment>
+                  </Animated.View>
                 ))}
               </GlassCard>
             </Animated.View>
@@ -237,6 +258,46 @@ export default function SearchScreen() {
         </ScrollView>
       </View>
     </KeyboardAvoidingView>
+  );
+}
+
+// ─── Floating feedback state ───────────────────────────────────────────────────
+
+function FloatingFeedback({
+  emoji,
+  color,
+  message,
+}: {
+  emoji: string;
+  color: string;
+  message: string;
+}) {
+  const floatY = useSharedValue(0);
+
+  useEffect(() => {
+    floatY.value = withRepeat(
+      withSequence(
+        withTiming(-7, { duration: 1900, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0, { duration: 1900, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1,
+      false,
+    );
+  }, [floatY]);
+
+  const floatStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: floatY.value }],
+  }));
+
+  return (
+    <View style={styles.feedback}>
+      <Animated.View style={floatStyle}>
+        <Text variant="title2" color={color}>{emoji}</Text>
+      </Animated.View>
+      <Text variant="body" color={color} style={styles.feedbackText}>
+        {message}
+      </Text>
+    </View>
   );
 }
 
@@ -280,45 +341,51 @@ function SavedRow({
   onPress: (l: WeatherLocation) => void;
   onRemove: () => void;
 }) {
+  const press = useSpringPress({ scale: 0.97 });
+
   return (
-    <Pressable
-      onPress={() => onPress(item)}
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-      accessibilityRole="button"
-    >
-      <View style={styles.rowLeading}>
-        <SymbolView
-          name={{ ios: 'location.fill', android: 'location_on', web: 'location_on' }}
-          size={14}
-          tintColor={isActive ? '#60A5FA' : GlassColors.white30}
-        />
-        <View style={styles.rowText}>
-          <Text variant="body" weight={isActive ? '600' : '400'} color="#FFFFFF">
-            {item.name}
-          </Text>
-          <Text variant="caption1" color={GlassColors.white50}>
-            {item.isCurrentLocation ? `${item.country} · My Location` : item.country}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.rowActions}>
-        {isActive && (
+    <Animated.View style={press.animStyle}>
+      <Pressable
+        onPress={() => onPress(item)}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
+        style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+        accessibilityRole="button"
+      >
+        <View style={styles.rowLeading}>
           <SymbolView
-            name={{ ios: 'checkmark.circle.fill', android: 'check_circle', web: 'check_circle' }}
-            size={17}
-            tintColor="#60A5FA"
+            name={{ ios: 'location.fill', android: 'location_on', web: 'location_on' }}
+            size={14}
+            tintColor={isActive ? '#60A5FA' : GlassColors.white30}
           />
-        )}
-        <Pressable
-          onPress={onRemove}
-          hitSlop={8}
-          style={styles.circleButton}
-          accessibilityLabel="Remove saved city"
-        >
-          <Text variant="caption2" weight="700" color={GlassColors.white50}>×</Text>
-        </Pressable>
-      </View>
-    </Pressable>
+          <View style={styles.rowText}>
+            <Text variant="body" weight={isActive ? '600' : '400'} color="#FFFFFF">
+              {item.name}
+            </Text>
+            <Text variant="caption1" color={GlassColors.white50}>
+              {item.isCurrentLocation ? `${item.country} · My Location` : item.country}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.rowActions}>
+          {isActive && (
+            <SymbolView
+              name={{ ios: 'checkmark.circle.fill', android: 'check_circle', web: 'check_circle' }}
+              size={17}
+              tintColor="#60A5FA"
+            />
+          )}
+          <Pressable
+            onPress={onRemove}
+            hitSlop={8}
+            style={styles.circleButton}
+            accessibilityLabel="Remove saved city"
+          >
+            <Text variant="caption2" weight="700" color={GlassColors.white50}>×</Text>
+          </Pressable>
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -335,36 +402,42 @@ function RecentRow({
   onPress: (l: WeatherLocation) => void;
   onDelete: () => void;
 }) {
+  const press = useSpringPress({ scale: 0.97 });
+
   return (
-    <Pressable
-      onPress={() => onPress(item)}
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-      accessibilityRole="button"
-    >
-      <View style={styles.rowLeading}>
-        <SymbolView
-          name={{ ios: 'clock', android: 'history', web: 'history' }}
-          size={14}
-          tintColor={GlassColors.white30}
-        />
-        <View style={styles.rowText}>
-          <Text variant="body" weight={isActive ? '600' : '400'} color="#FFFFFF">
-            {item.name}
-          </Text>
-          <Text variant="caption1" color={GlassColors.white50}>
-            {item.country}
-          </Text>
-        </View>
-      </View>
+    <Animated.View style={press.animStyle}>
       <Pressable
-        onPress={onDelete}
-        hitSlop={8}
-        style={styles.circleButton}
-        accessibilityLabel="Remove from recents"
+        onPress={() => onPress(item)}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
+        style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+        accessibilityRole="button"
       >
-        <Text variant="caption2" weight="700" color={GlassColors.white30}>×</Text>
+        <View style={styles.rowLeading}>
+          <SymbolView
+            name={{ ios: 'clock', android: 'history', web: 'history' }}
+            size={14}
+            tintColor={GlassColors.white30}
+          />
+          <View style={styles.rowText}>
+            <Text variant="body" weight={isActive ? '600' : '400'} color="#FFFFFF">
+              {item.name}
+            </Text>
+            <Text variant="caption1" color={GlassColors.white50}>
+              {item.country}
+            </Text>
+          </View>
+        </View>
+        <Pressable
+          onPress={onDelete}
+          hitSlop={8}
+          style={styles.circleButton}
+          accessibilityLabel="Remove from recents"
+        >
+          <Text variant="caption2" weight="700" color={GlassColors.white30}>×</Text>
+        </Pressable>
       </Pressable>
-    </Pressable>
+    </Animated.View>
   );
 }
 
@@ -383,51 +456,83 @@ function ResultRow({
   onPress: (l: WeatherLocation) => void;
   onToggleSave: (l: WeatherLocation) => void;
 }) {
+  const press = useSpringPress({ scale: 0.97 });
+
   return (
-    <Pressable
-      onPress={() => onPress(item)}
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-      accessibilityRole="button"
-    >
-      <View style={styles.rowLeading}>
-        <View style={styles.rowText}>
-          <Text variant="body" weight={isActive ? '600' : '400'} color="#FFFFFF">
-            {item.name}
-          </Text>
-          <Text variant="caption1" color={GlassColors.white50}>
-            {item.country}
-          </Text>
+    <Animated.View style={press.animStyle}>
+      <Pressable
+        onPress={() => onPress(item)}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
+        style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+        accessibilityRole="button"
+      >
+        <View style={styles.rowLeading}>
+          <View style={styles.rowText}>
+            <Text variant="body" weight={isActive ? '600' : '400'} color="#FFFFFF">
+              {item.name}
+            </Text>
+            <Text variant="caption1" color={GlassColors.white50}>
+              {item.country}
+            </Text>
+          </View>
         </View>
-      </View>
-      <View style={styles.rowActions}>
-        {isActive && (
+        <View style={styles.rowActions}>
+          {isActive && (
+            <SymbolView
+              name={{ ios: 'checkmark.circle.fill', android: 'check_circle', web: 'check_circle' }}
+              size={16}
+              tintColor="#60A5FA"
+            />
+          )}
+          <BookmarkButton isSaved={isSaved} onPress={() => onToggleSave(item)} />
           <SymbolView
-            name={{ ios: 'checkmark.circle.fill', android: 'check_circle', web: 'check_circle' }}
-            size={16}
-            tintColor="#60A5FA"
+            name={{ ios: 'chevron.right', android: 'navigate_next', web: 'navigate_next' }}
+            size={12}
+            tintColor={GlassColors.white30}
           />
-        )}
-        <Pressable
-          onPress={() => onToggleSave(item)}
-          hitSlop={8}
-          accessibilityLabel={isSaved ? 'Remove from saved' : 'Save city'}
-        >
-          <SymbolView
-            name={{
-              ios: isSaved ? 'bookmark.fill' : 'bookmark',
-              android: isSaved ? 'bookmark' : 'bookmark_border',
-              web: isSaved ? 'bookmark' : 'bookmark_border',
-            }}
-            size={16}
-            tintColor={isSaved ? '#60A5FA' : GlassColors.white50}
-          />
-        </Pressable>
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+// ─── Bookmark button with spring pop ──────────────────────────────────────────
+
+function BookmarkButton({
+  isSaved,
+  onPress,
+}: {
+  isSaved: boolean;
+  onPress: () => void;
+}) {
+  const scale = useSharedValue(1);
+
+  const handlePress = useCallback(() => {
+    scale.value = withSequence(
+      withSpring(1.5, { damping: 7, stiffness: 450 }),
+      withSpring(1, { damping: 12, stiffness: 280 }),
+    );
+    onPress();
+  }, [scale, onPress]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Pressable onPress={handlePress} hitSlop={8} accessibilityLabel={isSaved ? 'Remove from saved' : 'Save city'}>
+      <Animated.View style={animStyle}>
         <SymbolView
-          name={{ ios: 'chevron.right', android: 'navigate_next', web: 'navigate_next' }}
-          size={12}
-          tintColor={GlassColors.white30}
+          name={{
+            ios: isSaved ? 'bookmark.fill' : 'bookmark',
+            android: isSaved ? 'bookmark' : 'bookmark_border',
+            web: isSaved ? 'bookmark' : 'bookmark_border',
+          }}
+          size={16}
+          tintColor={isSaved ? '#60A5FA' : GlassColors.white50}
         />
-      </View>
+      </Animated.View>
     </Pressable>
   );
 }
@@ -443,7 +548,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#0C0A1E',
   },
 
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -462,20 +566,17 @@ const styles = StyleSheet.create({
     width: 36,
   },
 
-  // Input
   inputWrapper: {
     paddingHorizontal: 16,
     paddingBottom: 8,
   },
 
-  // Scroll
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 4,
     flexGrow: 1,
   },
 
-  // Section header
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -488,12 +589,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
 
-  // Card container
   card: {
     marginBottom: 4,
   },
 
-  // Row (shared base)
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -529,7 +628,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Centered feedback states
   feedback: {
     alignItems: 'center',
     justifyContent: 'center',

@@ -1,14 +1,18 @@
-import React, { useEffect } from 'react';
-import { View, type ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { LayoutChangeEvent, View, type ViewStyle } from 'react-native';
 import Animated, {
-  useSharedValue,
+  Easing,
   useAnimatedStyle,
+  useSharedValue,
   withRepeat,
   withTiming,
-  Easing,
 } from 'react-native-reanimated';
 
-import { GlassColors, Radius, Duration } from '@/design/tokens';
+import { GlassColors, Radius } from '@/design/tokens';
+
+const SHIMMER_W = 180;
+const SHIMMER_DURATION = 1400;
 
 // ─── Base skeleton block ───────────────────────────────────────────────────────
 
@@ -20,31 +24,68 @@ export interface SkeletonProps {
 }
 
 export function Skeleton({ width, height, borderRadius = Radius.md, style }: SkeletonProps) {
-  const opacity = useSharedValue(0.3);
+  const shimmerX = useSharedValue(-SHIMMER_W);
+  const containerW = useRef(300);
+
+  const startShimmer = useCallback(() => {
+    shimmerX.value = -SHIMMER_W;
+    shimmerX.value = withRepeat(
+      withTiming(containerW.current + SHIMMER_W, {
+        duration: SHIMMER_DURATION,
+        easing: Easing.linear,
+      }),
+      -1,
+      false,
+    );
+  }, [shimmerX]);
 
   useEffect(() => {
-    opacity.value = withRepeat(
-      withTiming(0.7, { duration: Duration.slower, easing: Easing.inOut(Easing.sin) }),
-      -1,
-      true,
-    );
-  }, [opacity]);
+    startShimmer();
+  }, [startShimmer]);
 
-  const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  const handleLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      const w = e.nativeEvent.layout.width;
+      if (w !== containerW.current) {
+        containerW.current = w;
+        startShimmer();
+      }
+    },
+    [startShimmer],
+  );
+
+  const shimmerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shimmerX.value }],
+  }));
 
   return (
-    <Animated.View
+    <View
+      onLayout={handleLayout}
       style={[
         {
           width,
           height,
           borderRadius,
-          backgroundColor: GlassColors.white30,
+          backgroundColor: GlassColors.white20,
+          overflow: 'hidden',
         },
-        animatedStyle,
         style,
       ]}
-    />
+    >
+      <Animated.View
+        style={[
+          { position: 'absolute', top: 0, bottom: 0, width: SHIMMER_W },
+          shimmerStyle,
+        ]}
+      >
+        <LinearGradient
+          colors={['transparent', 'rgba(255,255,255,0.22)', 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{ flex: 1 }}
+        />
+      </Animated.View>
+    </View>
   );
 }
 

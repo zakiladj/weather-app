@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SymbolView } from 'expo-symbols';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
   RefreshControl,
@@ -11,13 +11,19 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
+  Easing,
   Extrapolation,
   FadeInDown,
   FadeInUp,
   interpolate,
+  runOnJS,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 
 import { Button } from '@/components/ui/Button';
@@ -35,8 +41,10 @@ import {
 import { WeatherIcon } from '@/components/weather/WeatherIcon';
 import { getConditionGradient, getCurrentSkyGradient } from '@/design/gradients';
 import { GlassColors, Radius } from '@/design/tokens';
+import type { WeatherCondition } from '@/features/weather/types';
 import { useWeatherData } from '@/features/weather/hooks/use-weather-data';
 import { useLocation } from '@/hooks/use-location';
+import { useSpringPress } from '@/hooks/use-spring-press';
 import { useWeatherStore } from '@/store/weather.store';
 import { convertTemperature, convertWindSpeed, degreesToCompass } from '@/utils/weather';
 
@@ -76,9 +84,8 @@ export default function HomeScreen() {
   const skyGradient = getCurrentSkyGradient();
   const condGradient = getConditionGradient(condition, isNight);
 
-  // Show condition-specific gradient once we have data; sky gradient otherwise
   const activeBg = hasData ? condGradient : skyGradient;
-  const bgColors = activeBg.colors as [string, string, ...string[]];
+  const bgColors = activeBg.colors as readonly string[];
   const bgStart = activeBg.start ?? { x: 0, y: 0 };
   const bgEnd = activeBg.end ?? { x: 0, y: 1 };
 
@@ -111,6 +118,44 @@ export default function HomeScreen() {
     ];
   }, [weather, wind, windSpeedUnit, windDir, feelsLike, unitLabel]);
 
+  // ─── Animated background crossfade ──────────────────────────────────────────
+  // Two gradient layers: layer1 is the stable baseline, layer2 fades in on
+  // condition change, then layer1 updates to match and layer2 resets to invisible.
+
+  const [layer1Colors, setLayer1Colors] = useState<readonly string[]>(bgColors);
+  const [layer2Colors, setLayer2Colors] = useState<readonly string[]>(bgColors);
+  const layer2Opacity = useSharedValue(0);
+
+  const bgColorsRef = useRef<readonly string[]>(bgColors);
+  bgColorsRef.current = bgColors;
+
+  const gradKey = `${hasData ? condition : '__loading'}-${isNight ? 'n' : 'd'}`;
+  const gradKeyRef = useRef(gradKey); // Pre-seeded so mount never triggers a transition
+
+  useEffect(() => {
+    if (gradKey === gradKeyRef.current) return;
+    gradKeyRef.current = gradKey;
+
+    const next = bgColorsRef.current;
+    setLayer2Colors(next);
+    layer2Opacity.value = 0;
+    layer2Opacity.value = withTiming(
+      1,
+      { duration: 1100, easing: Easing.inOut(Easing.quad) },
+      (done) => {
+        if (done) {
+          runOnJS(setLayer1Colors)(next);
+          layer2Opacity.value = 0;
+        }
+      },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gradKey]);
+
+  const layer2AnimStyle = useAnimatedStyle(() => ({
+    opacity: layer2Opacity.value,
+  }));
+
   // ─── Scroll-driven animations ────────────────────────────────────────────────
 
   const scrollY = useSharedValue(0);
@@ -118,6 +163,20 @@ export default function HomeScreen() {
   const scrollHandler = useAnimatedScrollHandler((event) => {
     scrollY.value = event.contentOffset.y;
   });
+
+  // Background parallax — gradient moves up at 15% of scroll speed
+  const bgParallaxStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateY: interpolate(
+          scrollY.value,
+          [0, 600],
+          [0, -40],
+          Extrapolation.CLAMP,
+        ),
+      },
+    ],
+  }));
 
   const heroAnimStyle = useAnimatedStyle(() => ({
     opacity: interpolate(scrollY.value, [HERO_FADE_START, HERO_FADE_END], [1, 0], Extrapolation.CLAMP),
@@ -152,20 +211,38 @@ export default function HomeScreen() {
     ],
   }));
 
+  // ─── Menu button spring ──────────────────────────────────────────────────────
+
+  const menuPress = useSpringPress({ scale: 0.86, damping: 12, stiffness: 280 });
+
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <View style={styles.root}>
       <StatusBar translucent barStyle="light-content" backgroundColor="transparent" />
 
-      {/* Full-screen gradient */}
-      <LinearGradient
-        colors={bgColors}
-        start={bgStart}
-        end={bgEnd}
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={[StyleSheet.absoluteFill, styles.depthOverlay]} />
+      {/* ── Two-layer animated gradient background ── */}
+      <Animated.View
+        style={[StyleSheet.absoluteFill, { bottom: -50 }, bgParallaxStyle]}
+        pointerEvents="none"
+      >
+        <LinearGradient
+          colors={layer1Colors as [string, string, ...string[]]}
+          start={bgStart}
+          end={bgEnd}
+          style={StyleSheet.absoluteFill}
+        />
+        <Animated.View style={[StyleSheet.absoluteFill, layer2AnimStyle]}>
+          <LinearGradient
+            colors={layer2Colors as [string, string, ...string[]]}
+            start={bgStart}
+            end={bgEnd}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+      </Animated.View>
+
+      <View style={[StyleSheet.absoluteFill, styles.depthOverlay]} pointerEvents="none" />
 
       {/* ── No-location empty state ── */}
       {!activeLocation ? (
@@ -203,7 +280,7 @@ export default function HomeScreen() {
         </View>
       ) : (
         <>
-          {/* ── Sticky mini header (appears on scroll) ── */}
+          {/* ── Sticky mini header ── */}
           <Animated.View
             style={[
               styles.miniHeader,
@@ -257,17 +334,21 @@ export default function HomeScreen() {
                   {activeLocation.name}
                 </Text>
               </View>
-              <Pressable
-                style={styles.iconButton}
-                onPress={() => router.push('/search')}
-                accessibilityLabel="Search locations"
-              >
-                <SymbolView
-                  name={{ ios: 'line.3.horizontal', android: 'menu', web: 'menu' }}
-                  size={18}
-                  tintColor="#FFFFFF"
-                />
-              </Pressable>
+              <Animated.View style={menuPress.animStyle}>
+                <Pressable
+                  style={styles.iconButton}
+                  onPress={() => router.push('/search')}
+                  onPressIn={menuPress.onPressIn}
+                  onPressOut={menuPress.onPressOut}
+                  accessibilityLabel="Search locations"
+                >
+                  <SymbolView
+                    name={{ ios: 'line.3.horizontal', android: 'menu', web: 'menu' }}
+                    size={18}
+                    tintColor="#FFFFFF"
+                  />
+                </Pressable>
+              </Animated.View>
             </View>
 
             {/* Hero */}
@@ -279,7 +360,7 @@ export default function HomeScreen() {
                   <ErrorHero onRetry={onRefresh} />
                 ) : (
                   <View style={styles.heroContent}>
-                    <WeatherIcon condition={condition} isNight={isNight} size="2xl" />
+                    <FloatingWeatherIcon condition={condition} isNight={isNight} />
                     <Text
                       variant="display"
                       weight="200"
@@ -349,6 +430,40 @@ export default function HomeScreen() {
   );
 }
 
+// ─── Floating weather icon ─────────────────────────────────────────────────────
+// Gentle sine-wave float — runs entirely on the UI thread.
+
+function FloatingWeatherIcon({
+  condition,
+  isNight,
+}: {
+  condition: WeatherCondition;
+  isNight: boolean;
+}) {
+  const floatY = useSharedValue(0);
+
+  useEffect(() => {
+    floatY.value = withRepeat(
+      withSequence(
+        withTiming(-10, { duration: 2400, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0, { duration: 2400, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1,
+      false,
+    );
+  }, [floatY]);
+
+  const floatStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: floatY.value }],
+  }));
+
+  return (
+    <Animated.View style={floatStyle}>
+      <WeatherIcon condition={condition} isNight={isNight} size="2xl" />
+    </Animated.View>
+  );
+}
+
 // ─── Hero skeleton ─────────────────────────────────────────────────────────────
 
 function HeroSkeleton() {
@@ -393,7 +508,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.14)',
   },
 
-  // No-location empty state
   emptyState: {
     flex: 1,
     alignItems: 'center',
@@ -415,7 +529,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  // Mini sticky header
   miniHeader: {
     position: 'absolute',
     top: 0,
@@ -443,12 +556,10 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 
-  // Scroll content
   scrollContent: {
     flexGrow: 1,
   },
 
-  // Top bar
   topBar: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -472,7 +583,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Hero
   hero: {
     paddingTop: 12,
     paddingBottom: 36,
@@ -499,7 +609,6 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
 
-  // Cards area
   cards: {
     paddingHorizontal: 16,
     gap: 14,
