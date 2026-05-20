@@ -318,7 +318,12 @@ function SectionHeader({
         {title.toUpperCase()}
       </Text>
       {action && onAction && (
-        <Pressable onPress={onAction} hitSlop={8}>
+        <Pressable
+          onPress={onAction}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`${action} ${title.toLowerCase()}`}
+        >
           <Text variant="caption1" color={GlassColors.white50}>
             {action}
           </Text>
@@ -343,6 +348,8 @@ function SavedRow({
 }) {
   const press = useSpringPress({ scale: 0.97 });
 
+  const countryLabel = item.isCurrentLocation ? `${item.country}, My Location` : item.country;
+
   return (
     <Animated.View style={press.animStyle}>
       <Pressable
@@ -351,12 +358,15 @@ function SavedRow({
         onPressOut={press.onPressOut}
         style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
         accessibilityRole="button"
+        accessibilityLabel={`${item.name}, ${countryLabel}${isActive ? ', currently active' : ''}`}
+        accessibilityHint="Double tap to view weather for this city"
       >
         <View style={styles.rowLeading}>
           <SymbolView
             name={{ ios: 'location.fill', android: 'location_on', web: 'location_on' }}
             size={14}
             tintColor={isActive ? '#60A5FA' : GlassColors.white30}
+            importantForAccessibility="no"
           />
           <View style={styles.rowText}>
             <Text variant="body" weight={isActive ? '600' : '400'} color="#FFFFFF">
@@ -373,13 +383,15 @@ function SavedRow({
               name={{ ios: 'checkmark.circle.fill', android: 'check_circle', web: 'check_circle' }}
               size={17}
               tintColor="#60A5FA"
+              importantForAccessibility="no"
             />
           )}
           <Pressable
             onPress={onRemove}
-            hitSlop={8}
+            hitSlop={12}
             style={styles.circleButton}
-            accessibilityLabel="Remove saved city"
+            accessibilityRole="button"
+            accessibilityLabel={`Remove ${item.name} from saved cities`}
           >
             <Text variant="caption2" weight="700" color={GlassColors.white50}>×</Text>
           </Pressable>
@@ -412,12 +424,15 @@ function RecentRow({
         onPressOut={press.onPressOut}
         style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
         accessibilityRole="button"
+        accessibilityLabel={`${item.name}, ${item.country}${isActive ? ', currently active' : ''}`}
+        accessibilityHint="Double tap to view weather for this city"
       >
         <View style={styles.rowLeading}>
           <SymbolView
             name={{ ios: 'clock', android: 'history', web: 'history' }}
             size={14}
             tintColor={GlassColors.white30}
+            importantForAccessibility="no"
           />
           <View style={styles.rowText}>
             <Text variant="body" weight={isActive ? '600' : '400'} color="#FFFFFF">
@@ -430,9 +445,10 @@ function RecentRow({
         </View>
         <Pressable
           onPress={onDelete}
-          hitSlop={8}
+          hitSlop={12}
           style={styles.circleButton}
-          accessibilityLabel="Remove from recents"
+          accessibilityRole="button"
+          accessibilityLabel={`Remove ${item.name} from recent searches`}
         >
           <Text variant="caption2" weight="700" color={GlassColors.white30}>×</Text>
         </Pressable>
@@ -466,6 +482,8 @@ function ResultRow({
         onPressOut={press.onPressOut}
         style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
         accessibilityRole="button"
+        accessibilityLabel={`${item.name}, ${item.country}${isActive ? ', currently active' : ''}`}
+        accessibilityHint="Double tap to set as active location"
       >
         <View style={styles.rowLeading}>
           <View style={styles.rowText}>
@@ -483,13 +501,15 @@ function ResultRow({
               name={{ ios: 'checkmark.circle.fill', android: 'check_circle', web: 'check_circle' }}
               size={16}
               tintColor="#60A5FA"
+              importantForAccessibility="no"
             />
           )}
-          <BookmarkButton isSaved={isSaved} onPress={() => onToggleSave(item)} />
+          <BookmarkButton isSaved={isSaved} cityName={item.name} onPress={() => onToggleSave(item)} />
           <SymbolView
             name={{ ios: 'chevron.right', android: 'navigate_next', web: 'navigate_next' }}
             size={12}
             tintColor={GlassColors.white30}
+            importantForAccessibility="no"
           />
         </View>
       </Pressable>
@@ -501,9 +521,11 @@ function ResultRow({
 
 function BookmarkButton({
   isSaved,
+  cityName,
   onPress,
 }: {
   isSaved: boolean;
+  cityName: string;
   onPress: () => void;
 }) {
   const scale = useSharedValue(1);
@@ -521,7 +543,12 @@ function BookmarkButton({
   }));
 
   return (
-    <Pressable onPress={handlePress} hitSlop={8} accessibilityLabel={isSaved ? 'Remove from saved' : 'Save city'}>
+    <Pressable
+      onPress={handlePress}
+      hitSlop={12}
+      accessibilityRole="button"
+      accessibilityLabel={isSaved ? `Remove ${cityName} from saved cities` : `Save ${cityName}`}
+    >
       <Animated.View style={animStyle}>
         <SymbolView
           name={{

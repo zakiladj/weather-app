@@ -1,8 +1,7 @@
 import React from 'react';
-import { View, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
-import { Divider } from '@/components/ui/Divider';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { DailyItem } from '@/components/weather/DailyItem';
 import { GlassColors } from '@/design/tokens';
@@ -24,28 +23,17 @@ export function DailyForecastCard({
   const globalMax = Math.max(...items.map((d) => d.tempMax));
 
   return (
-    <GlassCard padding={false} radius={24} style={style}>
-      {/* Section header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 6,
-          paddingHorizontal: 16,
-          paddingTop: 14,
-          paddingBottom: 12,
-        }}
-      >
-        <Text variant="caption2" style={{ fontSize: 11 }}>📅</Text>
-        <Text variant="caption2" weight="600" color={GlassColors.white50}
-          style={{ letterSpacing: 0.8 }}>
+    <GlassCard padding={false} radius={26} style={style}>
+      {/* Premium section header */}
+      <View style={styles.header}>
+        <Text style={styles.headerIcon}>📅</Text>
+        <Text variant="caption1" weight="700" color={GlassColors.white50} style={styles.headerLabel}>
           7-DAY FORECAST
         </Text>
+        <View style={styles.headerRule} />
       </View>
 
-      <Divider color={GlassColors.white10} />
-
-      <View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
+      <View style={styles.list}>
         {items.map((item, index) => (
           <DailyItem
             key={item.date}
@@ -61,3 +49,31 @@ export function DailyForecastCard({
     </GlassCard>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 10,
+  },
+  headerIcon: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  headerLabel: {
+    letterSpacing: 1.2,
+  },
+  headerRule: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: GlassColors.white15,
+    marginLeft: 4,
+  },
+  list: {
+    paddingHorizontal: 16,
+    paddingBottom: 6,
+  },
+});

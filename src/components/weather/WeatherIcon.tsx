@@ -36,6 +36,7 @@ const SIZE_MAP = {
   lg: 52,
   xl: 72,
   '2xl': 96,
+  '3xl': 128,
 } as const;
 
 export type WeatherIconSize = keyof typeof SIZE_MAP;

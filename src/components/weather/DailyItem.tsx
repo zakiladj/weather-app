@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { View, type ViewStyle } from 'react-native';
 
@@ -14,9 +15,7 @@ export interface DailyItemProps {
   item: DailyForecast;
   isToday?: boolean;
   unit?: TemperatureUnit;
-  /** Global min across the 7-day range — used to draw the temperature bar */
   globalMin: number;
-  /** Global max across the 7-day range */
   globalMax: number;
   showDivider?: boolean;
   style?: ViewStyle;
@@ -31,26 +30,32 @@ export function DailyItem({
   showDivider = true,
   style,
 }: DailyItemProps) {
-  const low = convertTemperature(item.tempMin, unit);
+  const low  = convertTemperature(item.tempMin, unit);
   const high = convertTemperature(item.tempMax, unit);
   const gMin = convertTemperature(globalMin, unit);
   const gMax = convertTemperature(globalMax, unit);
   const range = Math.max(gMax - gMin, 1);
 
   const barStart = (low - gMin) / range;
-  const barWidth = (high - low) / range;
+  const barWidth = Math.max((high - low) / range, 0.06);
+
   const dayLabel = isToday ? 'Today' : formatWeekday(item.date);
   const showRain = item.precipitationChance > 20;
+
+  const a11yLabel = [
+    dayLabel,
+    item.condition,
+    `low ${low}°`,
+    `high ${high}°`,
+    showRain ? `${item.precipitationChance}% chance of rain` : null,
+  ].filter(Boolean).join(', ');
 
   return (
     <View style={style}>
       <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingVertical: 12,
-          gap: 12,
-        }}
+        accessible
+        accessibilityLabel={a11yLabel}
+        style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 13, gap: 12 }}
       >
         {/* Day name */}
         <Text
@@ -62,7 +67,7 @@ export function DailyItem({
           {dayLabel}
         </Text>
 
-        {/* Rain chance (fixed slot so columns align) */}
+        {/* Rain chance slot */}
         <View style={{ width: 36, alignItems: 'center' }}>
           {showRain && (
             <Text variant="caption1" weight="600" color="#93C5FD">
@@ -71,43 +76,57 @@ export function DailyItem({
           )}
         </View>
 
-        {/* Icon */}
+        {/* Condition icon */}
         <WeatherIcon condition={item.condition} size="sm" style={{ width: 28 }} />
 
-        {/* Temperature range bar */}
+        {/* Gradient temperature bar */}
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text variant="footnote" weight="500" color={GlassColors.white50} style={{ width: 28, textAlign: 'right' }}>
+          <Text
+            variant="footnote"
+            weight="500"
+            color={GlassColors.white50}
+            style={{ width: 28, textAlign: 'right' }}
+          >
             {low}°
           </Text>
 
+          {/* Bar track */}
           <View
             style={{
               flex: 1,
-              height: 4,
-              borderRadius: 2,
-              backgroundColor: GlassColors.white20,
+              height: 5,
+              borderRadius: 3,
+              backgroundColor: GlassColors.white10,
               overflow: 'hidden',
             }}
           >
-            <View
+            {/* Gradient bar fill — positioned by percentage */}
+            <LinearGradient
+              colors={['#38BDF8', '#60A5FA', '#FBBF24', '#F97316']}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
               style={{
                 position: 'absolute',
-                left: `${barStart * 100}%`,
-                width: `${barWidth * 100}%`,
+                left: `${barStart * 100}%` as unknown as number,
+                width: `${barWidth * 100}%` as unknown as number,
                 height: '100%',
-                borderRadius: 2,
-                backgroundColor: '#FCD34D',
+                borderRadius: 3,
               }}
             />
           </View>
 
-          <Text variant="footnote" weight="700" color="#FFFFFF" style={{ width: 28 }}>
+          <Text
+            variant="footnote"
+            weight="700"
+            color="#FFFFFF"
+            style={{ width: 28 }}
+          >
             {high}°
           </Text>
         </View>
       </View>
 
-      {showDivider && <Divider color={GlassColors.white10} />}
+      {showDivider && <Divider color={GlassColors.white8} />}
     </View>
   );
 }

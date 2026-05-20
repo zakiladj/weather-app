@@ -167,3 +167,30 @@ Removed 17 Expo template files that were no longer needed:
 5. **Location search screen** — new `app/search.tsx` stack screen; `Input` component driving OWM geocoding; results stored via `addSavedLocation` / `setActiveLocation`
 6. **Error & empty states** — network error banners, retry `Button`, empty location state on first launch
 7. **Pull-to-refresh** — `RefreshControl` on all `ScrollView`s calling React Query `refetch()`
+
+---
+
+## Phase 7 — Polish & release ✅ (2026-05-20)
+
+### Offline UX / stale-while-revalidate
+- `src/config/constants.ts` — `DEFAULT_CACHE_TIME_MS` raised to 2 hours
+- `src/features/weather/lib/network-error.ts` — `isNetworkError(error)` shared utility
+- `src/utils/format.ts` — `formatRelativeTime(timestamp)` helper
+- `src/features/weather/hooks/use-weather-data.ts` — `isOffline` + `dataUpdatedAt` exposed
+- `src/components/ui/OfflineBanner.tsx` — animated amber pill with relative timestamp
+- `src/app/(tabs)/index.tsx` — three offline states (banner / empty-no-cache / hard-error)
+- `src/app/(tabs)/forecast.tsx` — same pattern
+
+### Accessibility audit
+- `src/components/weather/HourlyItem.tsx` — `accessible + accessibilityLabel` row grouping
+- `src/components/weather/DailyItem.tsx` — same, includes day, condition, low/high, rain%
+- `src/components/weather/StatBadge.tsx` — grouped label "Humidity: 72%"
+- `src/components/ui/Button.tsx` — explicit `accessibilityRole="button"`, `accessibilityState`, `accessibilityLabel={label}`
+- `src/app/search.tsx` — city rows: `accessibilityLabel` with name + country + active state, `accessibilityHint`; `BookmarkButton` receives `cityName` for context labels; "Clear" gets `accessibilityRole="button"`; decorative icons `importantForAccessibility="no"`; small button `hitSlop` raised 8 → 12
+
+### App config
+- `app.json` — app `name` → "Weather"; splash + Android adaptive icon `backgroundColor` → `#0C0A1E`
+
+### Remaining (store submission)
+- Replace Expo placeholder icons with custom weather app icons (1024×1024 iOS, adaptive Android)
+- Fill App Store / Google Play listing: description, keywords, screenshots, privacy policy URL

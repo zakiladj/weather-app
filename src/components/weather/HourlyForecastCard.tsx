@@ -1,8 +1,7 @@
 import React from 'react';
-import { ScrollView, View, type ViewStyle } from 'react-native';
+import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
-import { Divider } from '@/components/ui/Divider';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { HourlyItem } from '@/components/weather/HourlyItem';
 import { GlassColors } from '@/design/tokens';
@@ -23,36 +22,21 @@ export function HourlyForecastCard({
   style,
 }: HourlyForecastCardProps) {
   return (
-    <GlassCard padding={false} radius={24} style={style}>
-      {/* Section header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 6,
-          paddingHorizontal: 16,
-          paddingTop: 14,
-          paddingBottom: 12,
-        }}
-      >
-        <Text variant="caption2" style={{ fontSize: 11 }}>🕐</Text>
-        <Text variant="caption2" weight="600" color={GlassColors.white50}
-          style={{ letterSpacing: 0.8 }}>
+    <GlassCard padding={false} radius={26} style={style}>
+      {/* Premium section header */}
+      <View style={styles.header}>
+        <Text style={styles.headerIcon}>🕐</Text>
+        <Text variant="caption1" weight="700" color={GlassColors.white50} style={styles.headerLabel}>
           HOURLY FORECAST
         </Text>
+        <View style={styles.headerRule} />
       </View>
-
-      <Divider color={GlassColors.white10} />
 
       {/* Horizontal scroll */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingHorizontal: 10,
-          paddingVertical: 10,
-          gap: 2,
-        }}
+        contentContainerStyle={styles.scrollContent}
       >
         {items.map((item, index) => (
           <HourlyItem
@@ -67,3 +51,32 @@ export function HourlyForecastCard({
     </GlassCard>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 10,
+  },
+  headerIcon: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  headerLabel: {
+    letterSpacing: 1.2,
+  },
+  headerRule: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: GlassColors.white15,
+    marginLeft: 4,
+  },
+  scrollContent: {
+    paddingHorizontal: 8,
+    paddingBottom: 12,
+    gap: 2,
+  },
+});

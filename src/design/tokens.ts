@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import type { TextStyle, ViewStyle } from 'react-native';
+import type { WeatherCondition } from '@/features/weather/types';
 
 // ─── Typography ────────────────────────────────────────────────────────────────
 // Mirrors the iOS Human Interface Guidelines type scale exactly.
@@ -194,16 +195,20 @@ export const GlassColors = {
   lightBg: 'rgba(255, 255, 255, 0.55)',
   lightBorder: 'rgba(255, 255, 255, 0.35)',
   lightSubtle: 'rgba(255, 255, 255, 0.20)',
-  darkBg: 'rgba(15, 23, 42, 0.50)',
-  darkBorder: 'rgba(255, 255, 255, 0.12)',
-  darkSubtle: 'rgba(255, 255, 255, 0.08)',
+  darkBg: 'rgba(4, 8, 28, 0.52)',
+  darkBorder: 'rgba(255, 255, 255, 0.14)',
+  darkSubtle: 'rgba(255, 255, 255, 0.06)',
+  white5: 'rgba(255, 255, 255, 0.05)',
+  white8: 'rgba(255, 255, 255, 0.08)',
   white10: 'rgba(255, 255, 255, 0.10)',
+  white15: 'rgba(255, 255, 255, 0.15)',
   white20: 'rgba(255, 255, 255, 0.20)',
   white30: 'rgba(255, 255, 255, 0.30)',
   white50: 'rgba(255, 255, 255, 0.50)',
   black10: 'rgba(0, 0, 0, 0.10)',
   black20: 'rgba(0, 0, 0, 0.20)',
   black30: 'rgba(0, 0, 0, 0.30)',
+  black50: 'rgba(0, 0, 0, 0.50)',
 } as const;
 
 // ─── Semantic colour values ────────────────────────────────────────────────────
@@ -249,3 +254,18 @@ export const HapticWeight = {
   medium: 'medium',
   heavy: 'heavy',
 } as const;
+
+// ─── Condition glow colours ────────────────────────────────────────────────────
+// Ambient glow colour behind the hero weather icon, keyed by condition + time.
+
+export const ConditionGlow: Record<WeatherCondition | 'default', { day: string; night: string }> = {
+  clear:        { day: '#FDE68A', night: '#818CF8' },
+  clouds:       { day: '#94A3B8', night: '#64748B' },
+  rain:         { day: '#60A5FA', night: '#3B82F6' },
+  drizzle:      { day: '#7DD3FC', night: '#38BDF8' },
+  thunderstorm: { day: '#A78BFA', night: '#7C3AED' },
+  snow:         { day: '#E0F2FE', night: '#BAE6FD' },
+  mist:         { day: '#CBD5E1', night: '#94A3B8' },
+  fog:          { day: '#CBD5E1', night: '#94A3B8' },
+  default:      { day: '#60A5FA', night: '#818CF8' },
+};

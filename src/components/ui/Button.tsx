@@ -116,6 +116,9 @@ export function Button({
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onPress={disabled || loading ? undefined : onPress}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: disabled || loading }}
+      accessibilityLabel={label}
       style={[
         animatedStyle,
         fullWidth && { alignSelf: 'stretch' },
