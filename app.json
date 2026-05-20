@@ -24,7 +24,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "extra": {
-      "weatherApiKey": "",
+      "weatherApiKey": "1dab03d886c560301dd32c2b57ae877d",
       "appEnv": "development"
     },
     "plugins": [

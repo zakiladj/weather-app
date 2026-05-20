@@ -35,8 +35,7 @@ import {
 import { WeatherIcon } from '@/components/weather/WeatherIcon';
 import { getConditionGradient, getCurrentSkyGradient } from '@/design/gradients';
 import { GlassColors, Radius } from '@/design/tokens';
-import { useCurrentWeather } from '@/features/weather/hooks/use-current-weather';
-import { useWeatherForecast } from '@/features/weather/hooks/use-weather-forecast';
+import { useWeatherData } from '@/features/weather/hooks/use-weather-data';
 import { useLocation } from '@/hooks/use-location';
 import { useWeatherStore } from '@/store/weather.store';
 import { convertTemperature, convertWindSpeed, degreesToCompass } from '@/utils/weather';
@@ -57,31 +56,16 @@ export default function HomeScreen() {
 
   const coords = activeLocation?.coordinates ?? null;
 
-  const {
-    data: weather,
-    isLoading: isWeatherLoading,
-    isError: isWeatherError,
-    refetch: refetchWeather,
-  } = useCurrentWeather(coords);
-
-  const {
-    data: forecast,
-    isLoading: isForecastLoading,
-    isError: isForecastError,
-    refetch: refetchForecast,
-  } = useWeatherForecast(coords);
-
-  const isLoading = isWeatherLoading || isForecastLoading;
-  const isError = isWeatherError || isForecastError;
-  const hasData = !!weather && !!forecast;
+  const { weather, forecast, isLoading, isError, hasData, refetch } =
+    useWeatherData(coords);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    await Promise.all([refetchWeather(), refetchForecast()]);
+    await refetch();
     setIsRefreshing(false);
-  }, [refetchWeather, refetchForecast]);
+  }, [refetch]);
 
   // ─── Derived display values ──────────────────────────────────────────────────
 

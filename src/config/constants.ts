@@ -7,6 +7,7 @@ export const WEATHER_ICON_URL = 'https://openweathermap.org/img/wn';
 
 export const DEFAULT_CACHE_TIME_MS = 1000 * 60 * 10; // 10 minutes
 export const STALE_TIME_MS = 1000 * 60 * 5; // 5 minutes
+export const REFETCH_INTERVAL_MS = 1000 * 60 * 10; // 10 minutes — background auto-refresh
 export const LOCATION_SEARCH_DEBOUNCE_MS = 400;
 
 export const MAX_SAVED_LOCATIONS = 10;

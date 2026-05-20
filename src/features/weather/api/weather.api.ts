@@ -1,7 +1,16 @@
 import { geoApi, weatherApi } from '@/lib/axios';
+import { ENV } from '@/config/env';
 import type { Coordinates } from '@/types';
 import { normalizeCondition } from '@/utils/weather';
 import type { CurrentWeather, WeatherForecast, WeatherLocation } from '../types';
+
+if (__DEV__ && !ENV.WEATHER_API_KEY) {
+  console.warn(
+    '[WeatherAPI] No API key found.\n' +
+    'Add your OpenWeatherMap key to app.json:\n' +
+    '  "extra": { "weatherApiKey": "YOUR_KEY_HERE" }',
+  );
+}
 
 // ─── Current weather ───────────────────────────────────────────────────────────
 

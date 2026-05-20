@@ -7,12 +7,18 @@ import { useWeatherStore } from '@/store/weather.store';
 export type LocationStatus = 'idle' | 'requesting' | 'denied' | 'ready';
 
 export function useLocation() {
-  const { activeLocation, setActiveLocation } = useWeatherStore();
-  const [status, setStatus] = useState<LocationStatus>(
-    activeLocation ? 'ready' : 'idle',
-  );
+  const { activeLocation, setActiveLocation, _hasHydrated } = useWeatherStore();
+  const [status, setStatus] = useState<LocationStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const didAutoRequest = useRef(false);
+
+  // Sync local status once we know a location was restored from persistence.
+  // Without this, the empty state flashes briefly on app restart.
+  useEffect(() => {
+    if (_hasHydrated && activeLocation && status === 'idle') {
+      setStatus('ready');
+    }
+  }, [_hasHydrated, activeLocation, status]);
 
   const requestGPS = useCallback(async () => {
     setStatus('requesting');
@@ -44,17 +50,19 @@ export function useLocation() {
     }
   }, [setActiveLocation]);
 
-  // Auto-detect if permission was already granted from a previous session
+  // Auto-detect GPS permission from a prior session — but only AFTER the
+  // persist middleware has finished loading from AsyncStorage. This prevents
+  // overwriting a user-saved city (e.g. Paris) with the device's GPS location.
   useEffect(() => {
-    if (activeLocation || didAutoRequest.current) return;
+    if (!_hasHydrated || activeLocation || didAutoRequest.current) return;
     didAutoRequest.current = true;
 
     Location.getForegroundPermissionsAsync().then(({ status: permStatus }) => {
       if (permStatus === 'granted') requestGPS();
     });
-    // requestGPS is stable (useCallback with stable setActiveLocation from Zustand)
+    // requestGPS is stable (useCallback with stable Zustand setter)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [_hasHydrated]);
 
   return {
     activeLocation,
